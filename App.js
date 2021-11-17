@@ -30,15 +30,45 @@ export default function App() {
         }
       });
   }, []);
+
+  useEffect(() => {
+    // 監聽用戶點擊通知事件
+    const clickSubscription =
+      Notifications.addNotificationResponseReceivedListener((response) => {
+        const type = response.notification.request.content.data.type;
+        if (type === "newMessage") {
+          // handle go to chatroom
+        }
+      });
+    // 監聽接收到通知事件
+    const showSubscription = Notifications.addNotificationReceivedListener(
+      (notification) => {
+        const type = notification.request.content.data.type;
+        if (type === "newMessage") {
+          // handle go to chatroom
+          console.log("is newMessage");
+        }
+      }
+    );
+
+    return () => {
+      clickSubscription.remove();
+      showSubscription.remove();
+    };
+  }, []);
+
   const triggerNotification = () => {
     Notifications.scheduleNotificationAsync({
       content: {
         title: "My first local notification",
         body: "This is the first local notification we are sending!",
-        sound: true // 開啟通知音效, 用戶需要有開啟聲音, 並且該 app 需要在背景執行, 才會有音效
+        sound: true, // 開啟通知音效, 用戶需要有開啟聲音, 並且該 app 需要在背景執行, 才會有音效
+        data: {
+          type: "newMessage" // 可傳遞到監聽事件內判斷, 並進行跳轉或其他邏輯處理
+        }
       },
       trigger: {
-        seconds: 10
+        seconds: 5
       }
     });
   };
