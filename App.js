@@ -1,6 +1,6 @@
 import { StatusBar } from "expo-status-bar";
-import React, { useEffect } from "react";
-import { StyleSheet, Text, View, Button } from "react-native";
+import React, { useEffect, useState } from "react";
+import { StyleSheet, View, Button } from "react-native";
 import * as Notifications from "expo-notifications";
 import * as Permissions from "expo-permissions";
 
@@ -15,6 +15,8 @@ Notifications.setNotificationHandler({
 });
 
 export default function App() {
+  const [pushToken, setPushToken] = useState("");
+
   useEffect(() => {
     // 檢查通知權限, 是否已經允許 app 使用通知功能, 若無授權則重新詢問
     Permissions.getAsync(Permissions.NOTIFICATIONS)
@@ -26,9 +28,19 @@ export default function App() {
       })
       .then((statusObj) => {
         if (statusObj.status !== "granted") {
-          return;
+          throw new Error("Permission not granted!");
         }
-      });
+      })
+      .then(() => {
+        console.log("get expo push notifications server token");
+        return Notifications.getExpoPushTokenAsync();
+      })
+      .then((data) => {
+        const pushToken = data.data;
+        console.log("pushToken", pushToken);
+        setPushToken(pushToken);
+      })
+      .catch(() => null);
   }, []);
 
   useEffect(() => {
@@ -43,6 +55,7 @@ export default function App() {
     // 監聽接收到通知事件
     const showSubscription = Notifications.addNotificationReceivedListener(
       (notification) => {
+        console.log("notification", notification);
         const type = notification.request.content.data.type;
         if (type === "newMessage") {
           // handle go to chatroom
@@ -57,6 +70,7 @@ export default function App() {
     };
   }, []);
 
+  // 本地推播
   const triggerNotification = () => {
     Notifications.scheduleNotificationAsync({
       content: {
@@ -68,14 +82,43 @@ export default function App() {
         }
       },
       trigger: {
-        seconds: 5
+        seconds: 5 // 5 秒後觸發
       }
+    });
+  };
+
+  // 透過 expo push server 推送訊息到某裝置上
+  const triggerNotificationToDevice = (idList = []) => {
+    fetch("https://exp.host/--/api/v2/push/send", {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Accept-Encoding": "gzip, deflate",
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        to: idList,
+        data: {
+          extraData: "Some data"
+        },
+        sound: "default",
+        title: "Send mars the app",
+        body: "This push notificatoin was send mars app!"
+      })
     });
   };
 
   return (
     <View style={styles.container}>
-      <Button title="Trigger Notification" onPress={triggerNotification} />
+      <Button
+        title="Trigger Notification from local"
+        onPress={triggerNotification}
+      />
+
+      <Button
+        title="Trigger Notification from push server"
+        onPress={() => triggerNotificationToDevice([pushToken])}
+      />
       <StatusBar style="auto" />
     </View>
   );
